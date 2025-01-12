@@ -2,12 +2,13 @@ package com.ixtlan.aurora.service
 
 import com.ixtlan.aurora.entity.Note
 import com.ixtlan.aurora.repository.NoteRepository
+import com.ixtlan.aurora.repository.FolderRepository
 import org.springframework.stereotype.Service
 
 @Service
 class NoteService(
     private val noteRepository: NoteRepository,
-    // private val folderRepository: FolderRepository
+    private val folderRepository: FolderRepository
 ) {
 
     fun getAllNotes(): List<Note> = noteRepository.findAll()
@@ -15,10 +16,9 @@ class NoteService(
     fun getNoteById(id: Long): Note? = noteRepository.findById(id).orElse(null)
 
     fun createNote(note: Note): Note {
-        // skip folder existence validation for now
-        // folderRepository.findById(note.folder.id).orElseThrow {
-        //    IllegalArgumentException("Folder with id ${note.folder.id} not found")
-        // }
+        folderRepository.findById(note.folder.id).orElseThrow {
+            IllegalArgumentException("Folder with id ${note.folder.id} not found")
+        }
         return noteRepository.save(note)
     }
 
@@ -26,10 +26,16 @@ class NoteService(
         val existingNote = noteRepository.findById(id).orElseThrow {
             IllegalArgumentException("Note with id $id not found")
         }
+
+        folderRepository.findById(updatedNote.folder.id).orElseThrow {
+            IllegalArgumentException("Folder with id ${updatedNote.folder.id} not found")
+        }
+
         val noteToSave = existingNote.copy(
             title = updatedNote.title,
             content = updatedNote.content,
-            modifiedDate = updatedNote.modifiedDate
+            modifiedDate = updatedNote.modifiedDate,
+            folder = updatedNote.folder
         )
         return noteRepository.save(noteToSave)
     }

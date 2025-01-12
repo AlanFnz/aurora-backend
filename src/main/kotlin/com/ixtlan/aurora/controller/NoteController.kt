@@ -4,28 +4,26 @@ import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
 import com.ixtlan.aurora.model.NoteRequest
 import com.ixtlan.aurora.model.NoteResponse
+import com.ixtlan.aurora.service.FolderService
 import com.ixtlan.aurora.service.NoteService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/notes")
-class NoteController(private val noteService: NoteService) {
+class NoteController(private val noteService: NoteService, private val folderService: FolderService) {
 
     @GetMapping
     // TODO: update return type once the folder resource is created
     fun getNotes(): ResponseEntity<List<NoteResponse?>> {
         val notes = noteService.getAllNotes().map {
-            // TODO: remove this wrapper once the folder resource is created
-            it.folder?.let { it1 ->
-                NoteResponse(
-                    id = it.id,
-                    title = it.title,
-                    content = it.content,
-                    folderId = it1.id,
-                    modifiedDate = it.modifiedDate
-                )
-            }
+            NoteResponse(
+                id = it.id,
+                title = it.title,
+                content = it.content,
+                folderId = it.folder.id ?: 0,
+                modifiedDate = it.modifiedDate
+            )
         }
         return ResponseEntity.ok(notes)
     }
@@ -34,43 +32,38 @@ class NoteController(private val noteService: NoteService) {
     fun getNoteById(@PathVariable id: Long): ResponseEntity<NoteResponse> {
         val note = noteService.getNoteById(id) ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(
-            // TODO: remove this wrapper once the folder resource is created
-            note.folder?.let {
-                NoteResponse(
-                    id = note.id,
-                    title = note.title,
-                    content = note.content,
-                    folderId = it.id,
-                    modifiedDate = note.modifiedDate
-                )
-            }
+            NoteResponse(
+                id = note.id,
+                title = note.title,
+                content = note.content,
+                folderId = note.folder.id ?: 0,
+                modifiedDate = note.modifiedDate
+            )
         )
     }
 
     @PostMapping
     fun createNote(@RequestBody noteRequest: NoteRequest): ResponseEntity<NoteResponse> {
-        // temporary mock folder
-        val mockFolder = Folder(id = noteRequest.folderId, folderName = "Mock Folder", notes = emptyList())
+        val folder = folderService.getFolderById(noteRequest.folderId)
+            ?: return ResponseEntity.badRequest().body(null)
 
         val note = noteService.createNote(
             Note(
                 title = noteRequest.title,
                 content = noteRequest.content,
                 modifiedDate = System.currentTimeMillis(),
-                folder = mockFolder
+                folder = folder
             )
         )
         return ResponseEntity.ok(
-            // TODO: remove this wrapper once the folder resource is created
-            note.folder?.let {
                 NoteResponse(
                     id = note.id,
                     title = note.title,
                     content = note.content,
-                    folderId = it.id,
+                    folderId = note.folder.id ?: 0,
                     modifiedDate = note.modifiedDate
                 )
-            }
+
         )
     }
 
@@ -79,8 +72,8 @@ class NoteController(private val noteService: NoteService) {
         @PathVariable id: Long,
         @RequestBody updatedNoteRequest: NoteRequest
     ): ResponseEntity<NoteResponse> {
-        // temporary mock folder
-        val mockFolder = Folder(id = updatedNoteRequest.folderId, folderName = "Mock Folder", notes = emptyList())
+        val folder = folderService.getFolderById(updatedNoteRequest.folderId)
+            ?: return ResponseEntity.badRequest().body(null)
 
         val updatedNote = noteService.updateNote(
             id,
@@ -89,7 +82,7 @@ class NoteController(private val noteService: NoteService) {
                 title = updatedNoteRequest.title,
                 content = updatedNoteRequest.content,
                 modifiedDate = System.currentTimeMillis(),
-                folder = mockFolder
+                folder = folder
             )
         )
         return ResponseEntity.ok(
