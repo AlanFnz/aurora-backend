@@ -14,8 +14,7 @@ import org.springframework.web.bind.annotation.*
 class NoteController(private val noteService: NoteService, private val folderService: FolderService) {
 
     @GetMapping
-    // TODO: update return type once the folder resource is created
-    fun getNotes(): ResponseEntity<List<NoteResponse?>> {
+    fun getNotes(): ResponseEntity<List<NoteResponse>> {
         val notes = noteService.getAllNotes().map {
             NoteResponse(
                 id = it.id,
