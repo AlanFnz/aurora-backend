@@ -14,15 +14,17 @@ import org.springframework.web.bind.annotation.*
 class NoteController(private val noteService: NoteService, private val folderService: FolderService) {
 
     @GetMapping
-    fun getNotes(): ResponseEntity<List<NoteResponse>> {
+    fun getNotes(): ResponseEntity<List<NoteResponse?>> {
         val notes = noteService.getAllNotes().map {
-            NoteResponse(
-                id = it.id,
-                title = it.title,
-                content = it.content,
-                folderId = it.folder.id ?: 0,
-                modifiedDate = it.modifiedDate
-            )
+            it.folder?.id?.let { it1 ->
+                NoteResponse(
+                    id = it.id,
+                    title = it.title,
+                    content = it.content,
+                    folderId = it1,
+                    modifiedDate = it.modifiedDate
+                )
+            }
         }
         return ResponseEntity.ok(notes)
     }
@@ -31,38 +33,37 @@ class NoteController(private val noteService: NoteService, private val folderSer
     fun getNoteById(@PathVariable id: Long): ResponseEntity<NoteResponse> {
         val note = noteService.getNoteById(id) ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(
-            NoteResponse(
-                id = note.id,
-                title = note.title,
-                content = note.content,
-                folderId = note.folder.id ?: 0,
-                modifiedDate = note.modifiedDate
-            )
+            note.folder?.id?.let {
+                NoteResponse(
+                    id = note.id,
+                    title = note.title,
+                    content = note.content,
+                    folderId = it,
+                    modifiedDate = note.modifiedDate
+                )
+            }
         )
     }
 
     @PostMapping
     fun createNote(@RequestBody noteRequest: NoteRequest): ResponseEntity<NoteResponse> {
-        val folder = folderService.getFolderById(noteRequest.folderId)
-            ?: return ResponseEntity.badRequest().body(null)
-
         val note = noteService.createNote(
             Note(
                 title = noteRequest.title,
                 content = noteRequest.content,
                 modifiedDate = System.currentTimeMillis(),
-                folder = folder
+                folder = noteRequest.folderId?.let { Folder(id = it, folderName = "") } // Pass folder ID or null
             )
         )
-        return ResponseEntity.ok(
-                NoteResponse(
-                    id = note.id,
-                    title = note.title,
-                    content = note.content,
-                    folderId = note.folder.id ?: 0,
-                    modifiedDate = note.modifiedDate
-                )
 
+        return ResponseEntity.ok(
+            NoteResponse(
+                id = note.id,
+                title = note.title,
+                content = note.content,
+                folderId = note.folder!!.id,
+                modifiedDate = note.modifiedDate
+            )
         )
     }
 
@@ -71,7 +72,7 @@ class NoteController(private val noteService: NoteService, private val folderSer
         @PathVariable id: Long,
         @RequestBody updatedNoteRequest: NoteRequest
     ): ResponseEntity<NoteResponse> {
-        val folder = folderService.getFolderById(updatedNoteRequest.folderId)
+        val folder = updatedNoteRequest.folderId?.let { folderService.getFolderById(it) }
             ?: return ResponseEntity.badRequest().body(null)
 
         val updatedNote = noteService.updateNote(
@@ -85,12 +86,12 @@ class NoteController(private val noteService: NoteService, private val folderSer
             )
         )
         return ResponseEntity.ok(
-            updatedNote.folder?.let {
+            updatedNote.folder?.id?.let {
                 NoteResponse(
                     id = updatedNote.id,
                     title = updatedNote.title,
                     content = updatedNote.content,
-                    folderId = it.id,
+                    folderId = it,
                     modifiedDate = updatedNote.modifiedDate
                 )
             }

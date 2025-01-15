@@ -16,6 +16,6 @@ data class Note(
     val modifiedDate: Long,
 
     @ManyToOne
-    @JoinColumn(name = "folder_id", nullable = false)
-    val folder: Folder
+    @JoinColumn(name = "folder_id", nullable = true)
+    val folder: Folder? = null
 )

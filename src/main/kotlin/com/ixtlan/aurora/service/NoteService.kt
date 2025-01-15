@@ -1,5 +1,6 @@
 package com.ixtlan.aurora.service
 
+import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
 import com.ixtlan.aurora.repository.NoteRepository
 import com.ixtlan.aurora.repository.FolderRepository
@@ -16,10 +17,14 @@ class NoteService(
     fun getNoteById(id: Long): Note? = noteRepository.findById(id).orElse(null)
 
     fun createNote(note: Note): Note {
-        folderRepository.findById(note.folder.id).orElseThrow {
-            IllegalArgumentException("Folder with id ${note.folder.id} not found")
-        }
-        return noteRepository.save(note)
+        val folder = note.folder?.id?.let {
+            folderRepository.findById(it).orElseGet {
+                folderRepository.save(Folder(folderName = "Default Folder"))
+            }
+        } ?: folderRepository.save(Folder(folderName = "Default Folder"))
+
+        val noteToSave = note.copy(folder = folder)
+        return noteRepository.save(noteToSave)
     }
 
     fun updateNote(id: Long, updatedNote: Note): Note {
@@ -27,8 +32,10 @@ class NoteService(
             IllegalArgumentException("Note with id $id not found")
         }
 
-        folderRepository.findById(updatedNote.folder.id).orElseThrow {
-            IllegalArgumentException("Folder with id ${updatedNote.folder.id} not found")
+        updatedNote.folder?.id?.let {
+            folderRepository.findById(it).orElseThrow {
+                IllegalArgumentException("Folder with id ${updatedNote.folder?.id} not found")
+            }
         }
 
         val noteToSave = existingNote.copy(
