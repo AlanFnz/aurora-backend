@@ -9,5 +9,5 @@ data class Folder(
     val id: Long = 0,
     val folderName: String,
     @OneToMany(mappedBy = "folder", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val notes: List<Note> = emptyList()
+    var notes: MutableList<Note> = mutableListOf()
 )
