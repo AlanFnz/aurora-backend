@@ -87,4 +87,14 @@ class FolderController(private val folderService: FolderService) {
         folderService.deleteFolder(id, cascadeDelete)
         return ResponseEntity.noContent().build()
     }
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgumentException(e: IllegalArgumentException): ResponseEntity<String> {
+        return ResponseEntity.badRequest().body(e.message)
+    }
+
+    @ExceptionHandler(IllegalStateException::class)
+    fun handleIllegalStateException(e: IllegalStateException): ResponseEntity<String> {
+        return ResponseEntity.badRequest().body(e.message)
+    }
 }
