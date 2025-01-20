@@ -4,6 +4,7 @@ import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
 import com.ixtlan.aurora.model.NoteRequest
 import com.ixtlan.aurora.model.NoteResponse
+import com.ixtlan.aurora.security.AuthenticationUtil
 import com.ixtlan.aurora.service.FolderService
 import com.ixtlan.aurora.service.NoteService
 import org.springframework.http.ResponseEntity
@@ -11,20 +12,22 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/notes")
-class NoteController(private val noteService: NoteService, private val folderService: FolderService) {
+class NoteController(
+    private val noteService: NoteService,
+    private val folderService: FolderService,
+    private val authenticationUtil: AuthenticationUtil
+) {
 
     @GetMapping
-    fun getNotes(): ResponseEntity<List<NoteResponse?>> {
-        val notes = noteService.getAllNotes().map {
-            it.folder?.id?.let { it1 ->
-                NoteResponse(
-                    id = it.id,
-                    title = it.title,
-                    content = it.content,
-                    folderId = it1,
-                    modifiedDate = it.modifiedDate
-                )
-            }
+    fun getNotes(): ResponseEntity<List<NoteResponse>> {
+        val notes = noteService.getAllNotes().map { note ->
+            NoteResponse(
+                id = note.id,
+                title = note.title,
+                content = note.content,
+                folderId = note.folder?.id ?: 0L,
+                modifiedDate = note.modifiedDate
+            )
         }
         return ResponseEntity.ok(notes)
     }
@@ -47,12 +50,22 @@ class NoteController(private val noteService: NoteService, private val folderSer
 
     @PostMapping
     fun createNote(@RequestBody noteRequest: NoteRequest): ResponseEntity<NoteResponse> {
+        val currentUser = authenticationUtil.getCurrentUser()
+        val folder = noteRequest.folderId?.let {
+            folderService.getFolderById(it, currentUser) ?: Folder(
+                id = it,
+                folderName = "New Folder",
+                user = currentUser
+            )
+        } ?: Folder(folderName = "Default Folder", user = currentUser)
+
         val note = noteService.createNote(
             Note(
                 title = noteRequest.title,
                 content = noteRequest.content,
                 modifiedDate = System.currentTimeMillis(),
-                folder = noteRequest.folderId?.let { Folder(id = it, folderName = "") } // Pass folder ID or null
+                folder = folder,
+                user = currentUser
             )
         )
 
@@ -72,7 +85,8 @@ class NoteController(private val noteService: NoteService, private val folderSer
         @PathVariable id: Long,
         @RequestBody updatedNoteRequest: NoteRequest
     ): ResponseEntity<NoteResponse> {
-        val folder = updatedNoteRequest.folderId?.let { folderService.getFolderById(it) }
+        val currentUser = authenticationUtil.getCurrentUser()
+        val folder = updatedNoteRequest.folderId?.let { folderService.getFolderById(it, currentUser) }
             ?: return ResponseEntity.badRequest().body(null)
 
         val updatedNote = noteService.updateNote(
@@ -82,7 +96,8 @@ class NoteController(private val noteService: NoteService, private val folderSer
                 title = updatedNoteRequest.title,
                 content = updatedNoteRequest.content,
                 modifiedDate = System.currentTimeMillis(),
-                folder = folder
+                folder = folder,
+                user = currentUser
             )
         )
         return ResponseEntity.ok(

@@ -17,5 +17,9 @@ data class Note(
 
     @ManyToOne
     @JoinColumn(name = "folder_id", nullable = true)
-    val folder: Folder? = null
+    val folder: Folder? = null,
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    val user: User
 )

@@ -1,41 +1,44 @@
 package com.ixtlan.aurora.service
 
 import com.ixtlan.aurora.entity.Folder
+import com.ixtlan.aurora.entity.User
 import com.ixtlan.aurora.repository.FolderRepository
 import com.ixtlan.aurora.repository.NoteRepository
 import org.springframework.stereotype.Service
 
 @Service
 class FolderService(
-    private val folderRepository: FolderRepository, private val noteRepository: NoteRepository,
+    private val folderRepository: FolderRepository,
+    private val noteRepository: NoteRepository,
 ) {
 
-    fun getAllFolders(): List<Folder> = folderRepository.findAll()
+    fun getAllFolders(user: User): List<Folder> = folderRepository.findAllByUser(user)
 
-    fun getFolderById(id: Long): Folder? = folderRepository.findById(id).orElse(null)
+    fun getFolderById(id: Long, user: User): Folder? = folderRepository.findByIdAndUser(id, user)
 
-    fun createFolder(folder: Folder): Folder = folderRepository.save(folder)
+    fun createFolder(folder: Folder, user: User): Folder {
+        val folderToSave = folder.copy(user = user)
+        return folderRepository.save(folderToSave)
+    }
 
-    fun updateFolder(id: Long, updatedFolder: Folder): Folder {
-        val existingFolder = folderRepository.findById(id).orElseThrow {
-            IllegalArgumentException("Folder with id $id not found")
-        }
+    fun updateFolder(id: Long, updatedFolder: Folder, user: User): Folder {
+        val existingFolder = folderRepository.findByIdAndUser(id, user)
+            ?: throw IllegalArgumentException("Folder with id $id not found")
+
         val folderToSave = existingFolder.copy(folderName = updatedFolder.folderName)
         return folderRepository.save(folderToSave)
     }
 
-    fun deleteFolder(id: Long, cascadeDelete: Boolean) {
-        val folder = folderRepository.findById(id).orElseThrow {
-            IllegalArgumentException("Folder with id $id not found")
-        }
+    fun deleteFolder(id: Long, cascadeDelete: Boolean, user: User) {
+        val folder = folderRepository.findByIdAndUser(id, user)
+            ?: throw IllegalArgumentException("Folder with id $id not found")
 
         if (cascadeDelete) {
             noteRepository.deleteAll(folder.notes)
-        } else {
-            if (folder.notes.isNotEmpty()) {
-                throw IllegalStateException("Cannot delete folder with existing notes. Use cascadeDelete=true.")
-            }
+        } else if (folder.notes.isNotEmpty()) {
+            throw IllegalStateException("Cannot delete folder with existing notes. Use cascadeDelete=true.")
         }
+
         folderRepository.delete(folder)
     }
 }

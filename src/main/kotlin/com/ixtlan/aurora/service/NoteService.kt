@@ -4,12 +4,14 @@ import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
 import com.ixtlan.aurora.repository.NoteRepository
 import com.ixtlan.aurora.repository.FolderRepository
+import com.ixtlan.aurora.security.AuthenticationUtil
 import org.springframework.stereotype.Service
 
 @Service
 class NoteService(
     private val noteRepository: NoteRepository,
-    private val folderRepository: FolderRepository
+    private val folderRepository: FolderRepository,
+    private val authenticationUtil: AuthenticationUtil,
 ) {
 
     fun getAllNotes(): List<Note> = noteRepository.findAll()
@@ -17,11 +19,12 @@ class NoteService(
     fun getNoteById(id: Long): Note? = noteRepository.findById(id).orElse(null)
 
     fun createNote(note: Note): Note {
+        val currentUser = authenticationUtil.getCurrentUser()
         val folder = note.folder?.id?.let {
             folderRepository.findById(it).orElseGet {
-                folderRepository.save(Folder(folderName = "Default Folder"))
+                folderRepository.save(Folder(folderName = "Default Folder", user = currentUser))
             }
-        } ?: folderRepository.save(Folder(folderName = "Default Folder"))
+        } ?: folderRepository.save(Folder(folderName = "Default Folder", user = currentUser))
 
         val noteToSave = note.copy(folder = folder)
         return noteRepository.save(noteToSave)
