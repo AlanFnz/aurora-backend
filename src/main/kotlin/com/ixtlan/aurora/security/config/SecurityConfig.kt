@@ -1,4 +1,4 @@
-package com.ixtlan.aurora.config
+package com.ixtlan.aurora.security.config
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
