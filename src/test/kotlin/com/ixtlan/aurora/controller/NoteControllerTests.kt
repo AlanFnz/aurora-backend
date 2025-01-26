@@ -5,8 +5,8 @@ import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
 import com.ixtlan.aurora.entity.User
 import com.ixtlan.aurora.model.NoteRequest
-import com.ixtlan.aurora.model.NoteResponse
 import com.ixtlan.aurora.security.AuthenticationUtil
+import com.ixtlan.aurora.security.CustomUserDetailsService
 import com.ixtlan.aurora.service.FolderService
 import com.ixtlan.aurora.service.NoteService
 import io.mockk.every
@@ -14,16 +14,19 @@ import io.mockk.just
 import io.mockk.runs
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import com.ninjasquad.springmockk.MockkBean
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import java.time.Instant
 
-@WebMvcTest(NoteController::class)
+@WebMvcTest(
+    controllers = [NoteController::class],
+    excludeAutoConfiguration = [org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration::class]
+)
 @AutoConfigureMockMvc(addFilters = false)
 class NoteControllerTest {
 
@@ -41,6 +44,9 @@ class NoteControllerTest {
 
     @MockkBean
     lateinit var authenticationUtil: AuthenticationUtil
+
+    @MockkBean
+    lateinit var customUserDetailsService: CustomUserDetailsService
 
     @Test
     fun `test getNotes should return a list of NoteResponse`() {
@@ -76,7 +82,6 @@ class NoteControllerTest {
         mockMvc.perform(get("/api/notes")).andExpect(status().isOk).andExpect(jsonPath("$[0].id").value(100))
             .andExpect(jsonPath("$[0].title").value("Title1")).andExpect(jsonPath("$[0].folderId").value(10))
             .andExpect(jsonPath("$[1].id").value(101)).andExpect(jsonPath("$[1].title").value("Title2"))
-
     }
 
     @Test
@@ -139,14 +144,17 @@ class NoteControllerTest {
             user = mockUser
         )
 
-        every { noteService.createNote(any()) } returns mockNote
+        every {
+            noteService.createNote(
+                title = "New Title", content = "New Content", folderId = 10, user = mockUser
+            )
+        } returns mockNote
 
         val jsonBody = objectMapper.writeValueAsString(noteRequest)
 
         mockMvc.perform(
             post("/api/notes").contentType(MediaType.APPLICATION_JSON).content(jsonBody)
-        )
-            .andExpect(status().isOk).andExpect(jsonPath("$.id").value(300))
+        ).andExpect(status().isOk).andExpect(jsonPath("$.id").value(300))
             .andExpect(jsonPath("$.title").value("New Title")).andExpect(jsonPath("$.folderId").value(10))
     }
 

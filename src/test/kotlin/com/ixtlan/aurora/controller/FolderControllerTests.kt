@@ -1,26 +1,32 @@
 package com.ixtlan.aurora.controller
 
-import io.mockk.*
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.ixtlan.aurora.entity.Folder
+import com.ixtlan.aurora.entity.Note
 import com.ixtlan.aurora.entity.User
 import com.ixtlan.aurora.model.FolderRequest
 import com.ixtlan.aurora.security.AuthenticationUtil
+import com.ixtlan.aurora.security.CustomUserDetailsService
 import com.ixtlan.aurora.service.FolderService
+import io.mockk.every
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
-import com.ixtlan.aurora.entity.Folder
-import com.ixtlan.aurora.entity.Note
 import com.ninjasquad.springmockk.MockkBean
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import java.time.Instant
 
-@WebMvcTest(FolderController::class)
+@WebMvcTest(
+    controllers = [FolderController::class],
+    excludeAutoConfiguration = [org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration::class]
+)
 @AutoConfigureMockMvc(addFilters = false)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS) // Add this annotation
 class FolderControllerTest {
 
     @Autowired
@@ -34,6 +40,9 @@ class FolderControllerTest {
 
     @MockkBean
     lateinit var authenticationUtil: AuthenticationUtil
+
+    @MockkBean
+    lateinit var customUserDetailsService: CustomUserDetailsService
 
     @Test
     fun `test getFolders should return a list of folders`() {
