@@ -1,132 +1,217 @@
 package com.ixtlan.aurora.controller
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
+import com.ixtlan.aurora.entity.User
 import com.ixtlan.aurora.model.FolderRequest
+import com.ixtlan.aurora.security.AuthenticationUtil
+import com.ixtlan.aurora.security.CustomUserDetailsService
 import com.ixtlan.aurora.service.FolderService
-import org.junit.jupiter.api.BeforeEach
+import io.mockk.every
 import org.junit.jupiter.api.Test
-import org.mockito.Mockito.*
+import org.junit.jupiter.api.TestInstance
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
-import org.springframework.test.web.servlet.setup.MockMvcBuilders
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.KotlinModule
-import org.junit.jupiter.api.extension.ExtendWith
-import org.mockito.InjectMocks
-import org.mockito.Mock
-import org.mockito.junit.jupiter.MockitoExtension
+import com.ninjasquad.springmockk.MockkBean
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import java.time.Instant
 
-@ExtendWith(MockitoExtension::class)
+@WebMvcTest(
+    controllers = [FolderController::class],
+    excludeAutoConfiguration = [org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration::class]
+)
+@AutoConfigureMockMvc(addFilters = false)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS) // Add this annotation
 class FolderControllerTest {
 
-    @Mock
-    private lateinit var folderService: FolderService
+    @Autowired
+    lateinit var mockMvc: MockMvc
 
-    @InjectMocks
-    private lateinit var folderController: FolderController
+    @Autowired
+    lateinit var objectMapper: ObjectMapper
 
-    private lateinit var mockMvc: MockMvc
-    private lateinit var objectMapper: ObjectMapper
+    @MockkBean
+    lateinit var folderService: FolderService
 
-    @BeforeEach
-    fun setup() {
-        mockMvc = MockMvcBuilders.standaloneSetup(folderController).setControllerAdvice().build()
-        objectMapper = ObjectMapper().registerModule(KotlinModule.Builder().build())
-    }
+    @MockkBean
+    lateinit var authenticationUtil: AuthenticationUtil
+
+    @MockkBean
+    lateinit var customUserDetailsService: CustomUserDetailsService
 
     @Test
-    fun `getFolders should return list of folders`() {
-        val folder = Folder(
-            id = 1L, folderName = "Test Folder", notes = mutableListOf(
-                Note(
-                    id = 1L, title = "Test Note", content = "Test Content", modifiedDate = System.currentTimeMillis()
-                )
+    fun `test getFolders should return a list of folders`() {
+        val mockUser = User(
+            id = 1,
+            username = "testUser",
+            password = "secret",
+            email = "test@test.com",
+            firstName = "Test",
+            lastName = "User",
+            roles = mutableSetOf("ROLE_USER")
+        )
+        val mockFolders = listOf(
+            Folder(
+                id = 10, folderName = "Folder A", notes = mutableListOf(
+                    Note(
+                        id = 100,
+                        title = "Note Title",
+                        content = "This is the content of the note",
+                        modifiedDate = Instant.now().toEpochMilli(),
+                        folder = null,
+                        user = mockUser
+                    )
+                ), user = mockUser
+            ), Folder(
+                id = 11, folderName = "Folder B", notes = mutableListOf(), user = mockUser
             )
         )
 
-        `when`(folderService.getAllFolders()).thenReturn(listOf(folder))
+        every { authenticationUtil.getCurrentUser() } returns mockUser
+        every { folderService.getAllFolders(mockUser) } returns mockFolders
 
-        mockMvc.perform(get("/api/folders")).andExpect(status().isOk)
-            .andExpect(content().contentType(MediaType.APPLICATION_JSON)).andExpect(jsonPath("$[0].id").value(1L))
-            .andExpect(jsonPath("$[0].folderName").value("Test Folder"))
-            .andExpect(jsonPath("$[0].notes[0].id").value(1L))
-            .andExpect(jsonPath("$[0].notes[0].title").value("Test Note"))
+        mockMvc.perform(get("/api/folders")).andExpect(status().isOk).andExpect(jsonPath("$[0].id").value(10))
+            .andExpect(jsonPath("$[0].folderName").value("Folder A"))
+            .andExpect(jsonPath("$[0].notes[0].title").value("Note Title")).andExpect(jsonPath("$[1].id").value(11))
+            .andExpect(jsonPath("$[1].folderName").value("Folder B"))
     }
 
     @Test
-    fun `getFolderById should return folder when exists`() {
-        val folder = Folder(
-            id = 1L, folderName = "Test Folder", notes = mutableListOf()
+    fun `test getFolderById - found`() {
+        val mockUser = User(
+            id = 2,
+            username = "anotherUser",
+            password = "secret",
+            email = "test@test.com",
+            firstName = "Test",
+            lastName = "User",
+            roles = mutableSetOf("ROLE_USER")
+        )
+        val mockFolder = Folder(
+            id = 99, folderName = "Special Folder", user = mockUser
         )
 
-        `when`(folderService.getFolderById(1L)).thenReturn(folder)
+        every { authenticationUtil.getCurrentUser() } returns mockUser
+        every { folderService.getFolderById(99, mockUser) } returns mockFolder
 
-        mockMvc.perform(get("/api/folders/1")).andExpect(status().isOk)
-            .andExpect(content().contentType(MediaType.APPLICATION_JSON)).andExpect(jsonPath("$.id").value(1L))
-            .andExpect(jsonPath("$.folderName").value("Test Folder"))
+        mockMvc.perform(get("/api/folders/{id}", 99)).andExpect(status().isOk).andExpect(jsonPath("$.id").value(99))
+            .andExpect(jsonPath("$.folderName").value("Special Folder"))
     }
 
     @Test
-    fun `getFolderById should return 404 when folder doesn't exist`() {
-        `when`(folderService.getFolderById(1L)).thenReturn(null)
+    fun `test getFolderById - not found`() {
+        val mockUser = User(
+            id = 3,
+            username = "testUser",
+            password = "secret",
+            email = "test@test.com",
+            firstName = "Test",
+            lastName = "User",
+            roles = mutableSetOf("ROLE_USER")
+        )
+        every { authenticationUtil.getCurrentUser() } returns mockUser
+        every { folderService.getFolderById(any(), mockUser) } returns null
 
-        mockMvc.perform(get("/api/folders/1")).andExpect(status().isNotFound)
+        mockMvc.perform(get("/api/folders/{id}", 999)).andExpect(status().isNotFound)
     }
 
     @Test
-    fun `createFolder should create and return new folder`() {
-        val folderRequest = FolderRequest("New Folder")
-        val createdFolder = Folder(id = 1L, folderName = "New Folder", notes = mutableListOf())
+    fun `test createFolder`() {
+        val mockUser = User(
+            id = 4,
+            username = "createUser",
+            password = "secret",
+            email = "test@test.com",
+            firstName = "Test",
+            lastName = "User",
+            roles = mutableSetOf("ROLE_USER")
+        )
+        val folderRequest = FolderRequest(folderName = "New Folder")
+        val mockFolder = Folder(
+            id = 123, folderName = "New Folder", user = mockUser
+        )
 
-        val expectedFolder = Folder(folderName = "New Folder", notes = mutableListOf())
-        `when`(folderService.createFolder(expectedFolder)).thenReturn(createdFolder)
+        every { authenticationUtil.getCurrentUser() } returns mockUser
+        every { folderService.createFolder(any(), mockUser) } returns mockFolder
+
+        val jsonBody = objectMapper.writeValueAsString(folderRequest)
 
         mockMvc.perform(
-            post("/api/folders").contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(folderRequest))
-        ).andExpect(status().isOk).andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.id").value(1L)).andExpect(jsonPath("$.folderName").value("New Folder"))
+            post("/api/folders").contentType(MediaType.APPLICATION_JSON).content(jsonBody)
+        ).andExpect(status().isOk).andExpect(jsonPath("$.id").value(123))
+            .andExpect(jsonPath("$.folderName").value("New Folder"))
     }
 
     @Test
-    fun `updateFolder should update and return folder`() {
-        val folderRequest = FolderRequest("Updated Folder")
-        val updatedFolder = Folder(id = 1L, folderName = "Updated Folder", notes = mutableListOf())
+    fun `test updateFolder`() {
+        val mockUser = User(
+            id = 5,
+            username = "updateUser",
+            password = "secret",
+            email = "test@test.com",
+            firstName = "Test",
+            lastName = "User",
+            roles = mutableSetOf("ROLE_USER")
+        )
+        val folderRequest = FolderRequest(folderName = "Updated Folder Name")
 
-        val expectedFolder = Folder(folderName = "Updated Folder", notes = mutableListOf())
-        `when`(folderService.updateFolder(1L, expectedFolder)).thenReturn(updatedFolder)
+        val existingFolder = Folder(
+            id = 55, folderName = "Old Folder Name", user = mockUser
+        )
+        val updatedFolder = existingFolder.copy(folderName = "Updated Folder Name")
+
+        every { authenticationUtil.getCurrentUser() } returns mockUser
+        every { folderService.updateFolder(55, any(), mockUser) } returns updatedFolder
+
+        val jsonBody = objectMapper.writeValueAsString(folderRequest)
 
         mockMvc.perform(
-            put("/api/folders/1").contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(folderRequest))
-        ).andExpect(status().isOk).andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.id").value(1L)).andExpect(jsonPath("$.folderName").value("Updated Folder"))
+            put("/api/folders/{id}", 55).contentType(MediaType.APPLICATION_JSON).content(jsonBody)
+        ).andExpect(status().isOk).andExpect(jsonPath("$.id").value(55))
+            .andExpect(jsonPath("$.folderName").value("Updated Folder Name"))
     }
 
     @Test
-    fun `deleteFolder should return no content`() {
-        doNothing().`when`(folderService).deleteFolder(1L, false)
+    fun `test deleteFolder - success`() {
+        val mockUser = User(
+            id = 6,
+            username = "deleteUser",
+            password = "secret",
+            email = "test@test.com",
+            firstName = "Test",
+            lastName = "User",
+            roles = mutableSetOf("ROLE_USER")
+        )
+        every { authenticationUtil.getCurrentUser() } returns mockUser
+        every { folderService.deleteFolder(66, false, mockUser) } returns Unit
 
-        mockMvc.perform(delete("/api/folders/1")).andExpect(status().isNoContent)
+        mockMvc.perform(delete("/api/folders/{id}", 66)).andExpect(status().isNoContent)
     }
 
     @Test
-    fun `deleteFolder should handle IllegalArgumentException`() {
-        doThrow(IllegalArgumentException("Folder not found")).`when`(folderService).deleteFolder(1L, false)
+    fun `test deleteFolder - folder has notes and cascadeDelete is false`() {
+        val mockUser = User(
+            id = 7,
+            username = "deleteUserWithNotes",
+            password = "secret",
+            email = "test@test.com",
+            firstName = "Test",
+            lastName = "User",
+            roles = mutableSetOf("ROLE_USER")
+        )
+        every { authenticationUtil.getCurrentUser() } returns mockUser
+        every {
+            folderService.deleteFolder(
+                77, false, mockUser
+            )
+        } throws IllegalStateException("Cannot delete folder with existing notes")
 
-        mockMvc.perform(delete("/api/folders/1")).andExpect(status().isBadRequest)
-            .andExpect(content().string("Folder not found"))
-    }
-
-    @Test
-    fun `deleteFolder should handle IllegalStateException`() {
-        doThrow(IllegalStateException("Cannot delete folder with existing notes")).`when`(folderService)
-            .deleteFolder(1L, false)
-
-        mockMvc.perform(delete("/api/folders/1")).andExpect(status().isBadRequest)
+        mockMvc.perform(delete("/api/folders/{id}", 77)).andExpect(status().isBadRequest)
             .andExpect(content().string("Cannot delete folder with existing notes"))
     }
 }

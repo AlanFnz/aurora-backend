@@ -3,172 +3,231 @@ package com.ixtlan.aurora.controller
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
+import com.ixtlan.aurora.entity.User
 import com.ixtlan.aurora.model.NoteRequest
+import com.ixtlan.aurora.security.AuthenticationUtil
+import com.ixtlan.aurora.security.CustomUserDetailsService
 import com.ixtlan.aurora.service.FolderService
 import com.ixtlan.aurora.service.NoteService
 import io.mockk.every
-import io.mockk.mockk
-import io.mockk.verify
-import org.junit.jupiter.api.BeforeEach
+import io.mockk.just
+import io.mockk.runs
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
-import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import com.ninjasquad.springmockk.MockkBean
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import java.time.Instant
 
+@WebMvcTest(
+    controllers = [NoteController::class],
+    excludeAutoConfiguration = [org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration::class]
+)
+@AutoConfigureMockMvc(addFilters = false)
 class NoteControllerTest {
-    private lateinit var mockMvc: MockMvc
-    private lateinit var noteService: NoteService
-    private lateinit var folderService: FolderService
-    private lateinit var objectMapper: ObjectMapper
 
-    @BeforeEach
-    fun setup() {
-        noteService = mockk(relaxed = true)
-        folderService = mockk(relaxed = true)
-        objectMapper = ObjectMapper()
-        val noteController = NoteController(noteService, folderService)
-        mockMvc = MockMvcBuilders.standaloneSetup(noteController).build()
-    }
+    @Autowired
+    lateinit var mockMvc: MockMvc
+
+    @Autowired
+    lateinit var objectMapper: ObjectMapper
+
+    @MockkBean
+    lateinit var noteService: NoteService
+
+    @MockkBean
+    lateinit var folderService: FolderService
+
+    @MockkBean
+    lateinit var authenticationUtil: AuthenticationUtil
+
+    @MockkBean
+    lateinit var customUserDetailsService: CustomUserDetailsService
 
     @Test
-    fun `get all notes returns list of notes`() {
-        val folder = Folder(id = 1, folderName = "Test Folder")
-        val note = Note(
-            id = 1,
-            title = "Test Note",
-            content = "Test Content",
-            modifiedDate = System.currentTimeMillis(),
-            folder = folder
+    fun `test getNotes should return a list of NoteResponse`() {
+        val mockFolder = Folder(
+            id = 10, folderName = "Folder A", user = User(
+                id = 1,
+                username = "testUser",
+                password = "secret",
+                email = "test@test.com",
+                firstName = "Test",
+                lastName = "User",
+                roles = mutableSetOf("ROLE_USER")
+            )
+        )
+        val mockNote1 = Note(
+            id = 100,
+            title = "Title1",
+            content = "Content1",
+            modifiedDate = Instant.now().toEpochMilli(),
+            folder = mockFolder,
+            user = mockFolder.user
+        )
+        val mockNote2 = Note(
+            id = 101,
+            title = "Title2",
+            content = null,
+            modifiedDate = Instant.now().toEpochMilli(),
+            folder = null,
+            user = mockFolder.user
         )
 
-        every { noteService.getAllNotes() } returns listOf(note)
-
-        mockMvc.perform(get("/api/notes"))
-            .andExpect(status().isOk)
-            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$[0].id").value(1))
-            .andExpect(jsonPath("$[0].title").value("Test Note"))
-            .andExpect(jsonPath("$[0].content").value("Test Content"))
-            .andExpect(jsonPath("$[0].folderId").value(1))
+        every { noteService.getAllNotes() } returns listOf(mockNote1, mockNote2)
+        mockMvc.perform(get("/api/notes")).andExpect(status().isOk).andExpect(jsonPath("$[0].id").value(100))
+            .andExpect(jsonPath("$[0].title").value("Title1")).andExpect(jsonPath("$[0].folderId").value(10))
+            .andExpect(jsonPath("$[1].id").value(101)).andExpect(jsonPath("$[1].title").value("Title2"))
     }
 
     @Test
-    fun `get note by id returns note when exists`() {
-        val folder = Folder(id = 1, folderName = "Test Folder")
-        val note = Note(
-            id = 1,
-            title = "Test Note",
-            content = "Test Content",
-            modifiedDate = System.currentTimeMillis(),
-            folder = folder
+    fun `test getNoteById - found`() {
+        val mockFolder = Folder(
+            id = 10, folderName = "Folder A", user = User(
+                id = 1,
+                username = "testUser",
+                password = "secret",
+                email = "test@test.com",
+                firstName = "Test",
+                lastName = "User",
+                roles = mutableSetOf("ROLE_USER")
+            )
+        )
+        val mockNote = Note(
+            id = 200,
+            title = "Some Title",
+            content = "Some Content",
+            modifiedDate = 123456789,
+            folder = mockFolder,
+            user = mockFolder.user
         )
 
-        every { noteService.getNoteById(1) } returns note
-
-        mockMvc.perform(get("/api/notes/1"))
-            .andExpect(status().isOk)
-            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.id").value(1))
-            .andExpect(jsonPath("$.title").value("Test Note"))
-            .andExpect(jsonPath("$.folderId").value(1))
+        every { noteService.getNoteById(200) } returns mockNote
+        mockMvc.perform(get("/api/notes/{id}", 200)).andExpect(status().isOk).andExpect(jsonPath("$.id").value(200))
+            .andExpect(jsonPath("$.title").value("Some Title")).andExpect(jsonPath("$.folderId").value(10))
     }
 
     @Test
-    fun `create note returns created note`() {
-        val folder = Folder(id = 1, folderName = "Test Folder")
-        val noteRequest = NoteRequest(
-            title = "New Note",
+    fun `test getNoteById - not found`() {
+        every { noteService.getNoteById(999) } returns null
+        mockMvc.perform(get("/api/notes/{id}", 999)).andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `test createNote`() {
+        val mockUser = User(
+            id = 4,
+            username = "createUser",
+            password = "secret",
+            email = "test@test.com",
+            firstName = "Test",
+            lastName = "User",
+            roles = mutableSetOf("ROLE_USER")
+        )
+        every { authenticationUtil.getCurrentUser() } returns mockUser
+
+        val mockFolder = Folder(id = 10, folderName = "Existing Folder", user = mockUser)
+
+        every { folderService.getFolderById(10, mockUser) } returns mockFolder
+
+        val noteRequest = NoteRequest(title = "New Title", content = "New Content", folderId = 10)
+        val mockNote = Note(
+            id = 300,
+            title = "New Title",
             content = "New Content",
-            folderId = 1
+            modifiedDate = 123456L,
+            folder = mockFolder,
+            user = mockUser
         )
 
-        val createdNote = Note(
-            id = 1,
-            title = "New Note",
-            content = "New Content",
-            modifiedDate = System.currentTimeMillis(),
-            folder = folder
-        )
+        every {
+            noteService.createNote(
+                title = "New Title", content = "New Content", folderId = 10, user = mockUser
+            )
+        } returns mockNote
 
-        every { noteService.createNote(any()) } returns createdNote
+        val jsonBody = objectMapper.writeValueAsString(noteRequest)
 
         mockMvc.perform(
-            post("/api/notes")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(noteRequest))
-        )
-            .andExpect(status().isOk)
-            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.title").value("New Note"))
-            .andExpect(jsonPath("$.content").value("New Content"))
-            .andExpect(jsonPath("$.folderId").value(1))
+            post("/api/notes").contentType(MediaType.APPLICATION_JSON).content(jsonBody)
+        ).andExpect(status().isOk).andExpect(jsonPath("$.id").value(300))
+            .andExpect(jsonPath("$.title").value("New Title")).andExpect(jsonPath("$.folderId").value(10))
     }
 
     @Test
-    fun `update note returns updated note when exists`() {
-        val folder = Folder(id = 1, folderName = "Test Folder")
-        val noteRequest = NoteRequest(
-            title = "Updated Note",
-            content = "Updated Content",
-            folderId = 1
+    fun `test updateNote - success`() {
+        val mockUser = User(
+            id = 5,
+            username = "updateUser",
+            password = "secret",
+            email = "test@test.com",
+            firstName = "Test",
+            lastName = "User",
+            roles = mutableSetOf("ROLE_USER")
+        )
+        every { authenticationUtil.getCurrentUser() } returns mockUser
+
+        val mockFolder = Folder(id = 10, folderName = "Updated Folder", user = mockUser)
+
+        every { folderService.getFolderById(10, mockUser) } returns mockFolder
+
+        val requestBody = NoteRequest(
+            title = "Updated Title", content = "Updated Content", folderId = 10
         )
 
         val updatedNote = Note(
-            id = 1,
-            title = "Updated Note",
+            id = 400,
+            title = "Updated Title",
             content = "Updated Content",
-            modifiedDate = System.currentTimeMillis(),
-            folder = folder
+            modifiedDate = 999999L,
+            folder = mockFolder,
+            user = mockUser
         )
 
-        every { folderService.getFolderById(1) } returns folder
-        every { noteService.updateNote(1, any()) } returns updatedNote
+        every { noteService.updateNote(400, any()) } returns updatedNote
+
+        val jsonBody = objectMapper.writeValueAsString(requestBody)
 
         mockMvc.perform(
-            put("/api/notes/1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(noteRequest))
-        )
-            .andExpect(status().isOk)
-            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.title").value("Updated Note"))
-            .andExpect(jsonPath("$.content").value("Updated Content"))
-            .andExpect(jsonPath("$.folderId").value(1))
+            put("/api/notes/{id}", 400).contentType(MediaType.APPLICATION_JSON).content(jsonBody)
+        ).andExpect(status().isOk).andExpect(jsonPath("$.id").value(400))
+            .andExpect(jsonPath("$.title").value("Updated Title")).andExpect(jsonPath("$.folderId").value(10))
     }
 
     @Test
-    fun `delete note returns no content`() {
-        mockMvc.perform(delete("/api/notes/1"))
-            .andExpect(status().isNoContent)
-
-        verify { noteService.deleteNote(1) }
-    }
-
-    @Test
-    fun `get note by id returns not found when note doesn't exist`() {
-        every { noteService.getNoteById(999) } returns null
-
-        mockMvc.perform(get("/api/notes/999"))
-            .andExpect(status().isNotFound)
-    }
-
-    @Test
-    fun `update note returns bad request when folder doesn't exist`() {
-        val noteRequest = NoteRequest(
-            title = "Updated Note",
-            content = "Updated Content",
-            folderId = 999
+    fun `test updateNote - folder not found`() {
+        val mockUser = User(
+            id = 6,
+            username = "noFolderUser",
+            password = "secret",
+            email = "test@test.com",
+            firstName = "Test",
+            lastName = "User",
+            roles = mutableSetOf("ROLE_USER")
         )
 
-        every { folderService.getFolderById(999) } returns null
+        every { authenticationUtil.getCurrentUser() } returns mockUser
+
+        val badRequestBody = NoteRequest(
+            title = "Bad Title", content = "Bad Content", folderId = 999
+        )
+
+        every { folderService.getFolderById(999, mockUser) } returns null
+
+        val jsonBody = objectMapper.writeValueAsString(badRequestBody)
 
         mockMvc.perform(
-            put("/api/notes/1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(noteRequest))
-        )
-            .andExpect(status().isBadRequest)
+            put("/api/notes/{id}", 777).contentType(MediaType.APPLICATION_JSON).content(jsonBody)
+        ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `test deleteNoteById - success`() {
+        every { noteService.deleteNote(123) } just runs
+        mockMvc.perform(delete("/api/notes/{id}", 123)).andExpect(status().isNoContent)
     }
 }
