@@ -35,9 +35,9 @@ class NoteService(
             IllegalArgumentException("Note with id $id not found")
         }
 
-        updatedNote.folder?.id?.let {
-            folderRepository.findById(it).orElseThrow {
-                IllegalArgumentException("Folder with id ${updatedNote.folder?.id} not found")
+        val updatedFolder = updatedNote.folder?.id?.let { folderId ->
+            folderRepository.findById(folderId).orElseThrow {
+                IllegalArgumentException("Folder with id $folderId not found")
             }
         }
 
@@ -45,7 +45,7 @@ class NoteService(
             title = updatedNote.title,
             content = updatedNote.content,
             modifiedDate = updatedNote.modifiedDate,
-            folder = updatedNote.folder
+            folder = updatedFolder ?: existingNote.folder
         )
         return noteRepository.save(noteToSave)
     }

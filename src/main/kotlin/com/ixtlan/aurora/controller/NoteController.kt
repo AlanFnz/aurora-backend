@@ -86,8 +86,12 @@ class NoteController(
         @RequestBody updatedNoteRequest: NoteRequest
     ): ResponseEntity<NoteResponse> {
         val currentUser = authenticationUtil.getCurrentUser()
-        val folder = updatedNoteRequest.folderId?.let { folderService.getFolderById(it, currentUser) }
-            ?: return ResponseEntity.badRequest().body(null)
+        var newFolder: Folder? = null
+
+        if (updatedNoteRequest.folderId != null) {
+            newFolder = folderService.getFolderById(updatedNoteRequest.folderId, currentUser)
+                ?: return ResponseEntity.badRequest().body(null)
+        }
 
         val updatedNote = noteService.updateNote(
             id,
@@ -96,7 +100,7 @@ class NoteController(
                 title = updatedNoteRequest.title,
                 content = updatedNoteRequest.content,
                 modifiedDate = System.currentTimeMillis(),
-                folder = folder,
+                folder = newFolder,
                 user = currentUser
             )
         )
