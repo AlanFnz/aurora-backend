@@ -2,6 +2,7 @@ package com.ixtlan.aurora.service
 
 import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
+import com.ixtlan.aurora.entity.User
 import com.ixtlan.aurora.repository.NoteRepository
 import com.ixtlan.aurora.repository.FolderRepository
 import com.ixtlan.aurora.security.AuthenticationUtil
@@ -18,16 +19,27 @@ class NoteService(
 
     fun getNoteById(id: Long): Note? = noteRepository.findById(id).orElse(null)
 
-    fun createNote(note: Note): Note {
-        val currentUser = authenticationUtil.getCurrentUser()
-        val folder = note.folder?.id?.let {
-            folderRepository.findById(it).orElseGet {
-                folderRepository.save(Folder(folderName = "Default Folder", user = currentUser))
+    fun createNote(
+        title: String,
+        content: String?,
+        folderId: Long?,
+        user: User
+    ): Note {
+        val folder = folderId?.let { id ->
+            folderRepository.findById(id).orElseGet {
+                folderRepository.save(Folder(id = id, folderName = "New Folder", user = user))
             }
-        } ?: folderRepository.save(Folder(folderName = "Default Folder", user = currentUser))
+        } ?: folderRepository.save(Folder(folderName = "New Folder", user = user))
 
-        val noteToSave = note.copy(folder = folder)
-        return noteRepository.save(noteToSave)
+        val note = Note(
+            title = title,
+            content = content,
+            modifiedDate = System.currentTimeMillis(),
+            folder = folder,
+            user = user
+        )
+
+        return noteRepository.save(note)
     }
 
     fun updateNote(id: Long, updatedNote: Note): Note {

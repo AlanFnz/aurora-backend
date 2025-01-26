@@ -36,37 +36,25 @@ class NoteController(
     fun getNoteById(@PathVariable id: Long): ResponseEntity<NoteResponse> {
         val note = noteService.getNoteById(id) ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(
-            note.folder?.id?.let {
-                NoteResponse(
-                    id = note.id,
-                    title = note.title,
-                    content = note.content,
-                    folderId = it,
-                    modifiedDate = note.modifiedDate
-                )
-            }
+            NoteResponse(
+                id = note.id,
+                title = note.title,
+                content = note.content,
+                folderId = note.folder?.id ?: 0L, // Use 0L as default if folder is null
+                modifiedDate = note.modifiedDate
+            )
         )
     }
 
     @PostMapping
     fun createNote(@RequestBody noteRequest: NoteRequest): ResponseEntity<NoteResponse> {
         val currentUser = authenticationUtil.getCurrentUser()
-        val folder = noteRequest.folderId?.let {
-            folderService.getFolderById(it, currentUser) ?: Folder(
-                id = it,
-                folderName = "New Folder",
-                user = currentUser
-            )
-        } ?: Folder(folderName = "Default Folder", user = currentUser)
-
         val note = noteService.createNote(
-            Note(
-                title = noteRequest.title,
-                content = noteRequest.content,
-                modifiedDate = System.currentTimeMillis(),
-                folder = folder,
-                user = currentUser
-            )
+            title = noteRequest.title,
+            content = noteRequest.content,
+            folderId = noteRequest.folderId,
+            user = currentUser
+
         )
 
         return ResponseEntity.ok(
@@ -74,7 +62,7 @@ class NoteController(
                 id = note.id,
                 title = note.title,
                 content = note.content,
-                folderId = note.folder!!.id,
+                folderId = note.folder?.id,
                 modifiedDate = note.modifiedDate
             )
         )
