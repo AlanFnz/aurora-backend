@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.web.filter.OncePerRequestFilter
+import org.slf4j.LoggerFactory
 
 @Component
 class JwtAuthenticationFilter(
@@ -18,17 +19,16 @@ class JwtAuthenticationFilter(
 ) : OncePerRequestFilter() {
 
     private val secretKey = "mysecretkeymysecretkeymysecretkey12" // 32+ chars for HMAC-SHA256
+    private val logger = LoggerFactory.getLogger(JwtAuthenticationFilter::class.java)
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
         val authHeader = request.getHeader("Authorization")
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             val token = authHeader.substring(7)
             try {
-                val claims: Claims = Jwts.parserBuilder()
-                    .setSigningKey(Keys.hmacShaKeyFor(secretKey.toByteArray()))
-                    .build()
-                    .parseClaimsJws(token)
-                    .body
+                val claims: Claims =
+                    Jwts.parserBuilder().setSigningKey(Keys.hmacShaKeyFor(secretKey.toByteArray())).build()
+                        .parseClaimsJws(token).body
 
                 val username = claims.subject
                 if (username != null) {
@@ -39,8 +39,10 @@ class JwtAuthenticationFilter(
                     SecurityContextHolder.getContext().authentication = authToken
                 }
             } catch (ex: Exception) {
-                // token invalid or expired
-                // TODO: do something
+                response.status = HttpServletResponse.SC_UNAUTHORIZED
+                response.contentType = "application/json"
+                response.writer.write("""{"error": "Unauthorized", "message": "${ex.message}"}""")
+                return
             }
         }
         chain.doFilter(request, response)
