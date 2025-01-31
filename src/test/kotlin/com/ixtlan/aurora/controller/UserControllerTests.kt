@@ -126,4 +126,24 @@ class UserControllerTest {
                 .content(objectMapper.writeValueAsString(request))
         ).andExpect(status().isOk).andExpect(jsonPath("$.token").isString)
     }
+
+    @Test
+    fun `test login - unauthorized`() {
+        val request = LoginRequest(username = "testUser", password = "wrongPassword")
+
+        every {
+            authenticationManager.authenticate(
+                UsernamePasswordAuthenticationToken(request.username, request.password)
+            )
+        } throws BadCredentialsException("Invalid credentials")
+
+        mockMvc.perform(
+            post("/api/users/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.error").value("Unauthorized"))
+            .andExpect(jsonPath("$.message").value("Invalid credentials"))
+    }
 }
