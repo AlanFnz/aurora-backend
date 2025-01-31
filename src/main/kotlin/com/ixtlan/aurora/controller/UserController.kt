@@ -7,8 +7,10 @@ import com.ixtlan.aurora.model.UserResponse
 import com.ixtlan.aurora.service.UserService
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.AuthenticationManager
+import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.*
@@ -41,22 +43,27 @@ class UserController(
     }
 
     @PostMapping("/login")
-    fun login(@RequestBody request: LoginRequest): LoginResponse {
-        val authentication: Authentication = authenticationManager.authenticate(
-            UsernamePasswordAuthenticationToken(request.username, request.password)
-        )
+    fun login(@RequestBody request: LoginRequest): ResponseEntity<LoginResponse> {
+        return try {
 
-        // Generate JWT
-        val now = Date()
-        val expiry = Date(now.time + expirationMs)
+            val authentication: Authentication = authenticationManager.authenticate(
+                UsernamePasswordAuthenticationToken(request.username, request.password)
+            )
 
-        val token = Jwts.builder()
-            .setSubject(request.username)
-            .setIssuedAt(now)
-            .setExpiration(expiry)
-            .signWith(Keys.hmacShaKeyFor(secretKey.toByteArray()))
-            .compact()
+            val now = Date()
+            val expiry = Date(now.time + expirationMs)
 
-        return LoginResponse(token)
+            val token = Jwts.builder()
+                .setSubject(request.username)
+                .setIssuedAt(now)
+                .setExpiration(expiry)
+                .signWith(Keys.hmacShaKeyFor(secretKey.toByteArray()))
+                .compact()
+
+            ResponseEntity.ok(LoginResponse(token))
+        } catch (e: BadCredentialsException) {
+            ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(LoginResponse(error = "Unauthorized", message = "Invalid credentials"))
+        }
     }
 }

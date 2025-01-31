@@ -1,5 +1,6 @@
 package com.ixtlan.aurora.security.config
 
+import com.ixtlan.aurora.security.CustomAuthenticationEntryPoint
 import com.ixtlan.aurora.security.CustomUserDetailsService
 import com.ixtlan.aurora.security.JwtAuthenticationFilter
 import org.springframework.context.annotation.Bean
@@ -14,7 +15,8 @@ import org.springframework.security.web.SecurityFilterChain
 
 @Configuration
 class SecurityConfig(
-    private val customUserDetailsService: CustomUserDetailsService
+    private val customUserDetailsService: CustomUserDetailsService,
+    private val customAuthenticationEntryPoint: CustomAuthenticationEntryPoint
 ) {
 
     @Bean
@@ -32,7 +34,9 @@ class SecurityConfig(
                 auth.requestMatchers("/api/users/register").permitAll()
                 auth.requestMatchers("/api/users/login").permitAll()
                 auth.anyRequest().authenticated()
-            }.addFilterBefore(
+            }
+            .exceptionHandling { it.authenticationEntryPoint(customAuthenticationEntryPoint) }
+            .addFilterBefore(
                 JwtAuthenticationFilter(customUserDetailsService),
                 org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter::class.java
             )
