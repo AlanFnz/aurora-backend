@@ -12,11 +12,11 @@ class UserService(
     private val userRepository: UserRepository, private val passwordEncoder: PasswordEncoder
 ) {
     fun registerUser(request: UserRegistrationRequest): UserResponse {
-        val finalEmail = request.email ?: ""
+        val finalEmail = request.email
         val finalFirstName = request.firstName ?: ""
         val finalLastName = request.lastName ?: ""
 
-        if (finalEmail.isNotEmpty() && userRepository.existsByEmail(finalEmail)) {
+        if (finalEmail != null && userRepository.existsByEmail(finalEmail)) {
             throw IllegalArgumentException("Email already taken")
         }
 

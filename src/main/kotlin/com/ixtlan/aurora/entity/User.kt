@@ -18,7 +18,7 @@ data class User(
     private var password: String,
 
     @Column(unique = true)
-    val email: String,
+    val email: String? = null,
 
     val firstName: String,
 
