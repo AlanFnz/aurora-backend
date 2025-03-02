@@ -18,6 +18,17 @@ class GlobalExceptionHandler {
         )
     }
 
+    @ExceptionHandler(FolderNotEmptyException::class)
+    fun handleFolderNotEmptyException(ex: FolderNotEmptyException): ResponseEntity<ErrorResponse> {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+            ErrorResponse(
+                error = "Folder Not Empty",
+                message = ex.message
+                    ?: "The folder cannot be deleted because it contains notes. Use cascadeDelete=true."
+            )
+        )
+    }
+
     @ExceptionHandler(InvalidFolderException::class)
     fun handleInvalidFolderException(ex: InvalidFolderException): ResponseEntity<ErrorResponse> {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
