@@ -18,7 +18,7 @@ class NoteServiceTest {
     private val folderRepository = mock(FolderRepository::class.java)
     private val authenticationUtil = mock(AuthenticationUtil::class.java)
 
-    private val noteService = NoteService(noteRepository, folderRepository, authenticationUtil)
+    private val noteService = NoteService(noteRepository, folderRepository)
 
     @Test
     fun `getAllNotes should return all notes`() {
@@ -93,44 +93,6 @@ class NoteServiceTest {
     }
 
     @Test
-    fun `createNote should create note with default folder if folderId is null`() {
-        val currentUser = User(
-            id = 1,
-            username = "testUser",
-            password = "secret",
-            email = "test@test.com",
-            firstName = "Test",
-            lastName = "User",
-            roles = mutableSetOf("ROLE_USER")
-        )
-        `when`(authenticationUtil.getCurrentUser()).thenReturn(currentUser)
-
-        val defaultFolder = Folder(id = 1, folderName = "New Folder", user = currentUser)
-        val savedNote = Note(
-            id = 10,
-            title = "Test Note",
-            content = "Test Content",
-            modifiedDate = System.currentTimeMillis(),
-            folder = defaultFolder,
-            user = currentUser
-        )
-
-        `when`(folderRepository.save(any(Folder::class.java))).thenReturn(defaultFolder)
-        `when`(noteRepository.save(any(Note::class.java))).thenReturn(savedNote)
-
-        val result = noteService.createNote(
-            title = "Test Note", content = "Test Content", folderId = null, user = currentUser
-        )
-
-        assertNotNull(result)
-        assertEquals("New Folder", result.folder?.folderName)
-        assertEquals(10, result.id)
-
-        verify(folderRepository).save(any(Folder::class.java))
-        verify(noteRepository).save(any(Note::class.java))
-    }
-
-    @Test
     fun `createNote should use existing folder if folderId is provided`() {
         val currentUser = User(
             id = 1,
@@ -153,7 +115,7 @@ class NoteServiceTest {
             user = currentUser
         )
 
-        `when`(folderRepository.findById(2)).thenReturn(Optional.of(existingFolder))
+        `when`(folderRepository.findByIdAndUser(2, currentUser)).thenReturn(existingFolder)
         `when`(noteRepository.save(any(Note::class.java))).thenReturn(savedNote)
 
         val result = noteService.createNote(
@@ -164,7 +126,7 @@ class NoteServiceTest {
         assertEquals(20, result.id)
         assertEquals("Personal", result.folder?.folderName)
 
-        verify(folderRepository).findById(2)
+        verify(folderRepository).findByIdAndUser(2, currentUser)
         verify(folderRepository, never()).save(any(Folder::class.java))
         verify(noteRepository).save(any(Note::class.java))
     }
@@ -192,14 +154,15 @@ class NoteServiceTest {
         )
         val updatedNote = existingNote.copy(title = "New Title", content = "New Content")
 
-        `when`(noteRepository.findById(1)).thenReturn(Optional.of(existingNote))
+        `when`(noteRepository.findByIdAndUser(1, currentUser)).thenReturn(existingNote)
+
         `when`(noteRepository.save(any(Note::class.java))).thenReturn(updatedNote)
 
-        val result = noteService.updateNote(1, updatedNote)
+        val result = noteService.updateNote(1, updatedNote, currentUser)
 
         assertEquals("New Title", result.title)
         assertEquals("New Content", result.content)
-        verify(noteRepository).findById(1)
+        verify(noteRepository).findByIdAndUser(1, currentUser)
         verify(noteRepository).save(any(Note::class.java))
     }
 

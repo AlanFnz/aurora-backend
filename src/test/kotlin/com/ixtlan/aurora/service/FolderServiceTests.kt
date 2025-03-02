@@ -3,6 +3,7 @@ package com.ixtlan.aurora.service
 import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
 import com.ixtlan.aurora.entity.User
+import com.ixtlan.aurora.exception.FolderNotEmptyException
 import com.ixtlan.aurora.repository.FolderRepository
 import com.ixtlan.aurora.repository.NoteRepository
 import org.junit.jupiter.api.Assertions.*
@@ -133,7 +134,7 @@ class FolderServiceTest {
         )
         `when`(folderRepository.findByIdAndUser(1, testUser)).thenReturn(folder)
 
-        assertThrows<IllegalStateException> {
+        assertThrows<FolderNotEmptyException> {
             folderService.deleteFolder(1, cascadeDelete = false, user = testUser)
         }
         verify(noteRepository, never()).deleteAll(anyList())

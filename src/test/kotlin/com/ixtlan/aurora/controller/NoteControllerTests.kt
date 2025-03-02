@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
 import com.ixtlan.aurora.entity.User
+import com.ixtlan.aurora.exception.FolderNotFoundException
 import com.ixtlan.aurora.model.NoteRequest
 import com.ixtlan.aurora.security.AuthenticationUtil
 import com.ixtlan.aurora.security.CustomUserDetailsService
@@ -171,31 +172,29 @@ class NoteControllerTest {
         )
         every { authenticationUtil.getCurrentUser() } returns mockUser
 
-        val mockFolder = Folder(id = 10, folderName = "Updated Folder", user = mockUser)
+        val existingNote = Note(id = 400, title = "Old Title", content = "Old Content", user = mockUser, modifiedDate = 0)
+        every { noteService.getNoteByIdAndUser(400, mockUser) } returns existingNote
 
-        every { folderService.getFolderById(10, mockUser) } returns mockFolder
-
-        val requestBody = NoteRequest(
-            title = "Updated Title", content = "Updated Content", folderId = 10
-        )
-
-        val updatedNote = Note(
-            id = 400,
+        val updatedNote = existingNote.copy(
             title = "Updated Title",
             content = "Updated Content",
             modifiedDate = 999999L,
-            folder = mockFolder,
-            user = mockUser
+            folder = Folder(id = 10, folderName = "Some Folder", user = mockUser)
         )
+        every { noteService.updateNote(400, any(), mockUser) } returns updatedNote
 
-        every { noteService.updateNote(400, any()) } returns updatedNote
-
+        val requestBody = NoteRequest(title = "Updated Title", content = "Updated Content", folderId = 10)
         val jsonBody = objectMapper.writeValueAsString(requestBody)
 
         mockMvc.perform(
-            put("/api/notes/{id}", 400).contentType(MediaType.APPLICATION_JSON).content(jsonBody)
-        ).andExpect(status().isOk).andExpect(jsonPath("$.id").value(400))
-            .andExpect(jsonPath("$.title").value("Updated Title")).andExpect(jsonPath("$.folderId").value(10))
+            put("/api/notes/{id}", 400)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonBody)
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.id").value(400))
+            .andExpect(jsonPath("$.title").value("Updated Title"))
+            .andExpect(jsonPath("$.folderId").value(10))
     }
 
     @Test
@@ -209,20 +208,23 @@ class NoteControllerTest {
             lastName = "User",
             roles = mutableSetOf("ROLE_USER")
         )
-
         every { authenticationUtil.getCurrentUser() } returns mockUser
 
-        val badRequestBody = NoteRequest(
-            title = "Bad Title", content = "Bad Content", folderId = 999
-        )
+        val existingNote = Note(id = 777, title = "Something", user = mockUser, modifiedDate = 0)
+        every { noteService.getNoteByIdAndUser(777, mockUser) } returns existingNote
 
-        every { folderService.getFolderById(999, mockUser) } returns null
+        every { noteService.updateNote(777, any(), mockUser) } throws FolderNotFoundException("Folder not found")
 
+        val badRequestBody = NoteRequest(title = "Bad Title", content = "Bad Content", folderId = 999)
         val jsonBody = objectMapper.writeValueAsString(badRequestBody)
 
         mockMvc.perform(
-            put("/api/notes/{id}", 777).contentType(MediaType.APPLICATION_JSON).content(jsonBody)
-        ).andExpect(status().isBadRequest)
+            put("/api/notes/{id}", 777)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonBody)
+        )
+            // Because we catch FolderNotFoundException in the controller => 400
+            .andExpect(status().isBadRequest)
     }
 
     @Test
