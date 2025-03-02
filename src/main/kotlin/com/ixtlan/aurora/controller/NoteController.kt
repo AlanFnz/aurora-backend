@@ -2,6 +2,7 @@ package com.ixtlan.aurora.controller
 
 import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.Note
+import com.ixtlan.aurora.exception.FolderNotFoundException
 import com.ixtlan.aurora.model.NoteRequest
 import com.ixtlan.aurora.model.NoteResponse
 import com.ixtlan.aurora.security.AuthenticationUtil
@@ -73,40 +74,40 @@ class NoteController(
     fun updateNote(
         @PathVariable id: Long,
         @Valid @RequestBody updatedNoteRequest: NoteRequest,
-        authenticationUtil: AuthenticationUtil
     ): ResponseEntity<NoteResponse> {
         val currentUser = authenticationUtil.getCurrentUser()
 
-        val existingNote = noteService.getNoteByIdAndUser(id, currentUser)
+        noteService.getNoteByIdAndUser(id, currentUser)
             ?: return ResponseEntity.notFound().build()
 
-        val folder = updatedNoteRequest.folderId?.let { folderId ->
-            folderService.getFolderById(folderId, currentUser)
-                ?: return ResponseEntity.badRequest().body(null)
-        } ?: existingNote.folder
-
-        val updatedNote = noteService.updateNote(
-            id,
-            Note(
-                id = id,
-                title = updatedNoteRequest.title,
-                content = updatedNoteRequest.content,
-                modifiedDate = System.currentTimeMillis(),
-                folder = folder,
-                user = currentUser
-            ),
-            currentUser
-        )
-
-        return ResponseEntity.ok(
-            NoteResponse(
-                id = updatedNote.id,
-                title = updatedNote.title,
-                content = updatedNote.content,
-                folderId = updatedNote.folder?.id ?: 0L,
-                modifiedDate = updatedNote.modifiedDate
+        return try {
+            val updatedNote = noteService.updateNote(
+                id,
+                Note(
+                    id = id,
+                    title = updatedNoteRequest.title,
+                    content = updatedNoteRequest.content,
+                    modifiedDate = System.currentTimeMillis(),
+                    folder = updatedNoteRequest.folderId?.let { fid ->
+                        Folder(id = fid, folderName = "", user = currentUser)
+                    },
+                    user = currentUser
+                ),
+                currentUser
             )
-        )
+
+            ResponseEntity.ok(
+                NoteResponse(
+                    id = updatedNote.id,
+                    title = updatedNote.title,
+                    content = updatedNote.content,
+                    folderId = updatedNote.folder?.id ?: 0L,
+                    modifiedDate = updatedNote.modifiedDate
+                )
+            )
+        } catch (ex: FolderNotFoundException) {
+            ResponseEntity.badRequest().build()
+        }
     }
 
     @DeleteMapping("/{id}")
