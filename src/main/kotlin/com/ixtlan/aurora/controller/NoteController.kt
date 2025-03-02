@@ -7,6 +7,7 @@ import com.ixtlan.aurora.model.NoteResponse
 import com.ixtlan.aurora.security.AuthenticationUtil
 import com.ixtlan.aurora.service.FolderService
 import com.ixtlan.aurora.service.NoteService
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -40,7 +41,7 @@ class NoteController(
                 id = note.id,
                 title = note.title,
                 content = note.content,
-                folderId = note.folder?.id ?: 0L, // Use 0L as default if folder is null
+                folderId = note.folder?.id ?: 0L,
                 modifiedDate = note.modifiedDate
             )
         )
@@ -62,7 +63,7 @@ class NoteController(
                 id = note.id,
                 title = note.title,
                 content = note.content,
-                folderId = note.folder?.id,
+                folderId = note.folder?.id ?: 0L,
                 modifiedDate = note.modifiedDate
             )
         )
@@ -71,15 +72,18 @@ class NoteController(
     @PutMapping("/{id}")
     fun updateNote(
         @PathVariable id: Long,
-        @RequestBody updatedNoteRequest: NoteRequest
+        @Valid @RequestBody updatedNoteRequest: NoteRequest,
+        authenticationUtil: AuthenticationUtil
     ): ResponseEntity<NoteResponse> {
         val currentUser = authenticationUtil.getCurrentUser()
-        var newFolder: Folder? = null
 
-        if (updatedNoteRequest.folderId != null) {
-            newFolder = folderService.getFolderById(updatedNoteRequest.folderId, currentUser)
+        val existingNote = noteService.getNoteByIdAndUser(id, currentUser)
+            ?: return ResponseEntity.notFound().build()
+
+        val folder = updatedNoteRequest.folderId?.let { folderId ->
+            folderService.getFolderById(folderId, currentUser)
                 ?: return ResponseEntity.badRequest().body(null)
-        }
+        } ?: existingNote.folder
 
         val updatedNote = noteService.updateNote(
             id,
@@ -88,20 +92,20 @@ class NoteController(
                 title = updatedNoteRequest.title,
                 content = updatedNoteRequest.content,
                 modifiedDate = System.currentTimeMillis(),
-                folder = newFolder,
+                folder = folder,
                 user = currentUser
-            )
+            ),
+            currentUser
         )
+
         return ResponseEntity.ok(
-            updatedNote.folder?.id?.let {
-                NoteResponse(
-                    id = updatedNote.id,
-                    title = updatedNote.title,
-                    content = updatedNote.content,
-                    folderId = it,
-                    modifiedDate = updatedNote.modifiedDate
-                )
-            }
+            NoteResponse(
+                id = updatedNote.id,
+                title = updatedNote.title,
+                content = updatedNote.content,
+                folderId = updatedNote.folder?.id ?: 0L,
+                modifiedDate = updatedNote.modifiedDate
+            )
         )
     }
 

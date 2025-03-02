@@ -2,6 +2,8 @@ package com.ixtlan.aurora.service
 
 import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.User
+import com.ixtlan.aurora.exception.FolderNotEmptyException
+import com.ixtlan.aurora.exception.FolderNotFoundException
 import com.ixtlan.aurora.repository.FolderRepository
 import com.ixtlan.aurora.repository.NoteRepository
 import org.springframework.stereotype.Service
@@ -23,7 +25,7 @@ class FolderService(
 
     fun updateFolder(id: Long, updatedFolder: Folder, user: User): Folder {
         val existingFolder = folderRepository.findByIdAndUser(id, user)
-            ?: throw IllegalArgumentException("Folder with id $id not found")
+            ?: throw FolderNotFoundException("Folder with id $id not found")
 
         val folderToSave = existingFolder.copy(folderName = updatedFolder.folderName)
         return folderRepository.save(folderToSave)
@@ -31,12 +33,12 @@ class FolderService(
 
     fun deleteFolder(id: Long, cascadeDelete: Boolean, user: User) {
         val folder = folderRepository.findByIdAndUser(id, user)
-            ?: throw IllegalArgumentException("Folder with id $id not found")
+            ?: throw FolderNotFoundException("Folder with id $id not found")
 
         if (cascadeDelete) {
             noteRepository.deleteAll(folder.notes)
         } else if (folder.notes.isNotEmpty()) {
-            throw IllegalStateException("Cannot delete folder with existing notes. Use cascadeDelete=true.")
+            throw FolderNotEmptyException("Cannot delete folder with existing notes. Use cascadeDelete=true.")
         }
 
         folderRepository.delete(folder)

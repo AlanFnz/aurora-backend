@@ -4,6 +4,6 @@ data class NoteResponse(
     val id: Long,
     val title: String,
     val content: String?,
-    val folderId: Long?,
+    val folderId: Long,
     val modifiedDate: Long
 )
