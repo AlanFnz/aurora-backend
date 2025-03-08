@@ -8,6 +8,7 @@ import com.ixtlan.aurora.repository.UserRepository
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class UserService(
@@ -16,6 +17,7 @@ class UserService(
     private val eventPublisher: ApplicationEventPublisher
 
 ) {
+    @Transactional
     fun registerUser(request: UserRegistrationRequest): UserResponse {
         val finalEmail = request.email
         val finalFirstName = request.firstName ?: ""

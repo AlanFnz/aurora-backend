@@ -4,6 +4,5 @@ import com.ixtlan.aurora.entity.User
 import org.springframework.context.ApplicationEvent
 
 class UserRegisteredEvent(
-    source: Any,
-    val user: User
+    source: Any, val user: User
 ) : ApplicationEvent(source)
