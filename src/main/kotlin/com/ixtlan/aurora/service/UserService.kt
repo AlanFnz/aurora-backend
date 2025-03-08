@@ -1,5 +1,6 @@
 package com.ixtlan.aurora.service
 
+import com.ixtlan.aurora.entity.Folder
 import com.ixtlan.aurora.entity.User
 import com.ixtlan.aurora.event.UserRegisteredEvent
 import com.ixtlan.aurora.model.UserRegistrationRequest
@@ -14,8 +15,9 @@ import org.springframework.transaction.annotation.Transactional
 class UserService(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
-    private val eventPublisher: ApplicationEventPublisher
-
+    // private val eventPublisher: ApplicationEventPublisher
+    private val folderService: FolderService,
+    private val noteService: NoteService
 ) {
     @Transactional
     fun registerUser(request: UserRegistrationRequest): UserResponse {
@@ -42,7 +44,20 @@ class UserService(
 
         val savedUser = userRepository.save(newUser)
 
-        eventPublisher.publishEvent(UserRegisteredEvent(this, savedUser))
+        val savedFolder = folderService.createFolder(
+            Folder(folderName = "Your first folder", user = savedUser),
+            savedUser
+        )
+
+        noteService.createNote(
+            title = "Your first note",
+            content = "Hello world!",
+            folderId = savedFolder.id,
+            user = savedUser
+        )
+
+        // TODO: Would be great to make it work with events
+        // eventPublisher.publishEvent(UserRegisteredEvent(this, savedUser))
 
         return UserResponse(
             id = savedUser.id,
