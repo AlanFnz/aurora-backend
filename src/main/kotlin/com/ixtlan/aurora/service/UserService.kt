@@ -1,15 +1,20 @@
 package com.ixtlan.aurora.service
 
 import com.ixtlan.aurora.entity.User
+import com.ixtlan.aurora.event.UserRegisteredEvent
 import com.ixtlan.aurora.model.UserRegistrationRequest
 import com.ixtlan.aurora.model.UserResponse
 import com.ixtlan.aurora.repository.UserRepository
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 
 @Service
 class UserService(
-    private val userRepository: UserRepository, private val passwordEncoder: PasswordEncoder
+    private val userRepository: UserRepository,
+    private val passwordEncoder: PasswordEncoder,
+    private val eventPublisher: ApplicationEventPublisher
+
 ) {
     fun registerUser(request: UserRegistrationRequest): UserResponse {
         val finalEmail = request.email
@@ -34,6 +39,8 @@ class UserService(
         )
 
         val savedUser = userRepository.save(newUser)
+
+        eventPublisher.publishEvent(UserRegisteredEvent(this, savedUser))
 
         return UserResponse(
             id = savedUser.id,
