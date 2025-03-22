@@ -58,6 +58,18 @@ class GlobalExceptionHandler {
             )
         )
     }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException::class)
+    fun handleHttpMessageNotReadableException(
+        ex: org.springframework.http.converter.HttpMessageNotReadableException
+    ): ResponseEntity<ErrorResponse> {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+            ErrorResponse(
+                error = "Bad Request",
+                message = "Invalid or missing request body."
+            )
+        )
+    }
 }
 
 data class ErrorResponse(
