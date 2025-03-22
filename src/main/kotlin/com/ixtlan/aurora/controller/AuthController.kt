@@ -36,4 +36,15 @@ class AuthController(
                 .body(mapOf("error" to "Unauthorized", "message" to ex.message))
         }
     }
+
+    @PostMapping("/logout")
+    fun logout(@RequestBody refreshRequest: RefreshRequest): ResponseEntity<Any> {
+        return try {
+            authService.logout(refreshRequest.refreshToken)
+            ResponseEntity.ok(mapOf("message" to "Logged out successfully"))
+        } catch (ex: BadCredentialsException) {
+            ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(mapOf("error" to "Unauthorized", "message" to ex.message))
+        }
+    }
 }

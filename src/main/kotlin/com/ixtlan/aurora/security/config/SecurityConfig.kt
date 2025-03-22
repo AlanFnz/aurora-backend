@@ -41,6 +41,7 @@ class SecurityConfig(
                 // new auth endpoints
                 auth.requestMatchers("/api/auth/login").permitAll()
                 auth.requestMatchers("/api/auth/refresh").permitAll()
+                auth.requestMatchers("/api/auth/logout").permitAll()
 
                 // everything else requires authentication
                 auth.anyRequest().authenticated()
