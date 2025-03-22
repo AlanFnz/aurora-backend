@@ -18,7 +18,7 @@ class JwtAuthenticationFilter(
     private val customUserDetailsService: CustomUserDetailsService
 ) : OncePerRequestFilter() {
 
-    private val secretKey = "mysecretkeymysecretkeymysecretkey12" // 32+ chars for HMAC-SHA256
+    private val secretKey = "mysecretkeymysecretkeymysecretkeyABCD"
     private val logger = LoggerFactory.getLogger(JwtAuthenticationFilter::class.java)
 
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {

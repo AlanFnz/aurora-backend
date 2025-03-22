@@ -22,18 +22,23 @@ class AuthService(
 
     // TODO: inject these from application.properties/environment variables
     //@Value("\${app.jwt.secret}")
-    private val jwtSecret: String,
+    //private val jwtSecret: String,
     //@Value("\${app.jwt.refresh-secret}")
-    private val refreshSecret: String,
-
+    //private val refreshSecret: String,
     //@Value("\${app.jwt.expiration-ms}")
-    private val jwtExpirationMs: Long,
+    //private val jwtExpirationMs: Long,
     //@Value("\${app.jwt.refresh-expiration-ms}")
-    private val refreshExpirationMs: Long,
+    //private val refreshExpirationMs: Long,
 
     // Optional: a RefreshTokenRepository if you want to store tokens in DB
     // private val refreshTokenRepository: RefreshTokenRepository
 ) {
+
+    // TODO: temporary hard coded values
+    private val jwtSecret = "mysecretkeymysecretkeymysecretkeyABCD"
+    private val refreshSecret = "myrefreshkeymyrefreshkeymyrefreshkeyXYZ"
+    private val jwtExpirationMs = 900_000L         // 15 minutes
+    private val refreshExpirationMs = 604_800_000L // 7 days
 
     fun login(authRequest: AuthRequest): AuthResponse {
         try {
